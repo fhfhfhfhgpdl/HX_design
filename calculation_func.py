@@ -120,6 +120,8 @@ def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val,
 
     h_tube_list, h_ann_list, U_list = [], [], []
     L_total = 0.0
+    PD_t_total = 0.0
+    PD_a_total = 0.0
     PD_t_total_sum = 0.0
     PD_a_total_sum = 0.0
 
