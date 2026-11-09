@@ -73,8 +73,13 @@ def nd_tube(c_p, rho, mu, k, e, p, theta, d_vi):
     else:
         Nu_t = 0.064 * (Re_t**0.773) * (e_star_t**-0.242) * (p_star_t**-0.108) * (theta_star_t**-0.599) * (Pr_t**0.4)
 
+    if 100 <= Re_t <= 1500:
+        f_t = (64 / (Re_t - 45.0)) * (0.554 * (e_star_t**0.384) * (p_star_t**(-1.454 + 2.083*e_star_t)) * (theta_star_t**-2.426))
+    else:
+        f_t = 1.209 * (Re_t**-0.261) * (e_star_t**(1.26 - 0.05*p_star_t)) * (p_star_t**(-1.66 + 2.033*e_star_t))
+
     h_t = Nu_t * k / d_vi
-    return h_t
+    return h_t, f_t, V_t
 
 def nd_annular(c_p, rho, mu, k, e, p, theta, d_vo, d_oi):
     Pr_a = c_p * mu / k
@@ -96,4 +101,71 @@ def nd_annular(c_p, rho, mu, k, e, p, theta, d_vo, d_oi):
     Nu_a = ( (f_a/8) * Re_a * Pr_a / (1 + 9.77 * math.sqrt(f_a/8) * (Pr_a**(2/3) - 1)) ) * (Re_a**-0.2) * (e_star_a**-0.32) * (p_star_a**-0.28) * (r_star**-1.64)
 
     h_a = Nu_a * k / d_hyd
-    return h_a
+    return h_a, f_a, V_a
+
+def PD(f,L,D,rho,V):
+    PD=f*(L/D)*(1/2)*rho*V**2
+    return PD
+
+def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val, d_oi):
+
+    d_vi, d_vo = hyd_dia(d_bi, d_ei, n_s_val)
+    theta, e = parameters(d_vo, d_eo, d_bo, n_s_val, p_val)
+    d_hyd = d_oi - d_vo
+
+    Th_nodes = np.linspace(50.0, 80.0, N_segments + 1)
+    Tc_current = 45.0  
+
+    h_tube_list, h_ann_list, U_list = [], [], []
+    L_total = 0.0
+    PD_t_total = 0.0
+    PD_a_total = 0.0
+
+    for i in range(N_segments):
+        Th_current = Th_nodes[i]
+        Th_next = Th_nodes[i+1]
+        Th_avg = (Th_current + Th_next) / 2.0
+        
+        Cp_h = calc_cp_libr(Th_avg, X_h)
+        rho_h = density_libr(Th_avg, X_h)
+        mu_h = viscosity_libr(Th_avg, X_h)
+        k_h = k_libr(Th_avg, X_h)
+        
+        dQ = m_h * Cp_h * (Th_next - Th_current) 
+        
+        Cp_c_in = calc_cp_libr(Tc_current, X_c)
+        dT_c = dQ / (m_c * Cp_c_in)
+        Tc_next = Tc_current + dT_c
+        Tc_avg = (Tc_current + Tc_next) / 2.0
+        
+        Cp_c = calc_cp_libr(Tc_avg, X_c)
+        rho_c = density_libr(Tc_avg, X_c)
+        mu_c = viscosity_libr(Tc_avg, X_c)
+        k_c = k_libr(Tc_avg, X_c)
+        
+        h_t, f_t, V_t = nd_tube(Cp_h, rho_h, mu_h, k_h, e, p_val, theta, d_vi)
+        h_a, f_a, V_a = nd_annular(Cp_c, rho_c, mu_c, k_c, e, p_val, theta, d_vo, d_oi)
+        
+        R_conv_i = (d_vo / d_vi) * (1.0 / h_t)
+        R_cond   = (d_vo / (2.0 * k_w)) * np.log(d_vo / d_vi)
+        R_conv_o = 1.0 / h_a
+        U_o = 1.0 / (R_conv_i + R_cond + R_conv_o)
+        
+        h_tube_list.append(h_t)
+        h_ann_list.append(h_a)
+        U_list.append(U_o)
+        
+        dT1 = Th_next - Tc_next
+        dT2 = Th_current - Tc_current
+        LMTD_local = (dT1 - dT2) / np.log(dT1 / dT2) if abs(dT1 - dT2) > 1e-5 else dT1
+            
+        dA = dQ / (U_o * LMTD_local)
+        dL = dA / (np.pi * d_vo)
+        
+        PD_t_total += PD(f_t, dL, d_vi, rho_h, V_t)
+        PD_a_total += PD(f_a, dL, d_hyd, rho_c, V_a)
+        
+        L_total += dL
+        Tc_current = Tc_next 
+        
+    return L_total, PD_t_total, PD_a_total, Tc_current, h_tube_list, h_ann_list, U_list
