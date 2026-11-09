@@ -76,8 +76,7 @@ def nd_tube(c_p, rho, mu, k, e, p, theta, d_vi):
     if 100 <= Re_t <= 1500:
         f_t = (64 / (Re_t - 45.0)) * (0.554 * (e_star_t**0.384) * (p_star_t**(-1.454 + 2.083*e_star_t)) * (theta_star_t**-2.426))
     else:
-        f_t = 1.209 * (Re_t**-0.261) * (e_star_t**(1.26 - 0.05*p_star_t)) * (p_star_t**(-1.66 + 2.033*e_star_t))
-
+        f_t = 1.209 * (Re_t**-0.261) * (e_star_t**(1.26 - 0.05*p_star_t)) * (p_star_t**(-1.66 + 2.033*e_star_t)) * (theta_star_t**(-2.699 + 3.670*e_star_t))
     h_t = Nu_t * k / d_vi
     return h_t, f_t, V_t
 
