@@ -6,7 +6,7 @@ N_segments = 100
 
 X_h = 60.0 
 X_c = 57.0
-L_tot_ref, PD_t_ref, PD_a_ref, Tc_out, h_tube_list, h_ann_list, U_list = hxc.run_simulation(
+L_tot_ref, PD_t_ref, PD_a_ref, PD_t_sum_ref, PD_a_sum_ref,  Tc_out, h_tube_list, h_ann_list, U_list = hxc.run_simulation(
     N_segments, X_h, X_c,
     hxc.d_bi_ref, hxc.d_ei_ref, hxc.d_eo_ref, hxc.d_bo_ref, 
     hxc.n_s_ref, hxc.p_ref, hxc.d_oi_ref
@@ -16,8 +16,10 @@ print("-" * 40)
 print("[ Reference Design Results ]")
 print(f"Total Tube Length (L_tot_ref) : {L_tot_ref:.4f} m")
 print(f"Cold Fluid Outlet (Tc_out)    : {Tc_out:.4f} ℃")
-print(f"Tube Side Pressure Drop       : {PD_t_ref:.4f} Pa")
-print(f"Annular Side Pressure Drop    : {PD_a_ref:.4f} Pa")
+print(f"Tube Side Pressure Drop(AVG)       : {PD_t_ref:.4f} Pa")
+print(f"Annular Side Pressure Drop(AVG)    : {PD_a_ref:.4f} Pa")
+print(f"Tube Side Pressure Drop(Sum)       : {PD_t_sum_ref:.4f} Pa")
+print(f"Annular Side Pressure Drop(Sum)    : {PD_a_sum_ref:.4f} Pa")
 print("-" * 40)
 
 h_tube_list.reverse()

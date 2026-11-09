@@ -108,18 +108,20 @@ def PD(f,L,D,rho,V):
     return PD
 
 def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val, d_oi):
-
+    T_1i=80
+    T_1o=50
+    T_2i=45
     d_vi, d_vo = hyd_dia(d_bi, d_ei, n_s_val)
     theta, e = parameters(d_vo, d_eo, d_bo, n_s_val, p_val)
     d_hyd = d_oi - d_vo
 
-    Th_nodes = np.linspace(50.0, 80.0, N_segments + 1)
+    Th_nodes = np.linspace(T_1o, T_1i, N_segments + 1)
     Tc_current = 45.0  
 
     h_tube_list, h_ann_list, U_list = [], [], []
     L_total = 0.0
-    PD_t_total = 0.0
-    PD_a_total = 0.0
+    PD_t_total_sum = 0.0
+    PD_a_total_sum = 0.0
 
     for i in range(N_segments):
         Th_current = Th_nodes[i]
@@ -162,10 +164,34 @@ def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val,
         dA = dQ / (U_o * LMTD_local)
         dL = dA / (np.pi * d_vo)
         
-        PD_t_total += PD(f_t, dL, d_vi, rho_h, V_t)
-        PD_a_total += PD(f_a, dL, d_hyd, rho_c, V_a)
+        PD_t_total_sum += PD(f_t, dL, d_vi, rho_h, V_t)
+        PD_a_total_sum += PD(f_a, dL, d_hyd, rho_c, V_a)
         
         L_total += dL
         Tc_current = Tc_next 
-        
-    return L_total, PD_t_total, PD_a_total, Tc_current, h_tube_list, h_ann_list, U_list
+    T_2o=Tc_current
+    Th_total_avg=(T_1i+T_1o)/2
+    Tc_total_avg=(T_2i+T_2o)/2
+
+    Cp_h_tot = calc_cp_libr(Th_total_avg, X_h)
+    rho_h_tot = density_libr(Th_total_avg, X_h)
+    mu_h_tot = viscosity_libr(Th_total_avg, X_h)
+    k_h_tot = k_libr(Th_total_avg, X_h)
+
+    Cp_c_tot = calc_cp_libr(Tc_total_avg, X_c)
+    rho_c_tot = density_libr(Tc_total_avg, X_c)
+    mu_c_tot = viscosity_libr(Tc_total_avg, X_c)
+    k_c_tot = k_libr(Tc_total_avg, X_c)
+
+    h_t_tot, f_t_tot, V_t_tot = nd_tube(
+        Cp_h_tot, rho_h_tot, mu_h_tot, k_h_tot, e, p_val, theta, d_vi
+    )
+    h_a_tot, f_a_tot, V_a_tot = nd_annular(
+        Cp_c_tot, rho_c_tot, mu_c_tot, k_c_tot, e, p_val, theta, d_vo, d_oi
+    )
+
+    PD_t_total = PD(f_t_tot, L_total, d_vi, rho_h_tot, V_t_tot)
+    PD_a_total = PD(f_a_tot, L_total, d_hyd, rho_c_tot, V_a_tot)
+
+
+    return L_total, PD_t_total, PD_a_total, PD_t_total_sum, PD_a_total_sum, Tc_current, h_tube_list, h_ann_list, U_list
