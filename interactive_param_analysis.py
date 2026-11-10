@@ -2,21 +2,16 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
-
-# 작성하신 파이썬 계산 모듈
+\
 import calculation_func as hxc
 
 st.set_page_config(
     page_title="Heat Exchanger Parametric Dashboard", layout="wide"
 )
 
-# 1. 헤더 및 로직 설정
-st.title("🔥 Liquid Heat Exchanger Parametric Analysis Dashboard")
-st.markdown(
-    "작성하신 파이썬 연산 모듈(`calculation_func.py`) 기반 인터랙티브 웹 대시보드입니다."
-)
+st.title("Heat Exchanger Parametric Analysis Dashboard")
 
-# 2. 기준값 (Reference Values) 세팅
+
 d_eo_ref = hxc.d_eo_ref
 d_bi_ref = hxc.d_bi_ref
 d_oi_ref = hxc.d_oi_ref
@@ -27,7 +22,6 @@ N_segments = 100
 X_h = 60.0
 X_c = 57.0
 
-# Reference 실행
 L_tot_ref, PD_t_ref, PD_a_ref, _, _, Tc_out_ref, _, _, _ = hxc.run_simulation(
     N_segments,
     X_h,
@@ -56,10 +50,8 @@ def find_intersections(x_arr, y_arr, limit_val):
   return intersections
 
 
-# 3. 좌측 사이드바: 고정 파라미터 무차원 수(*) 입력기
 st.sidebar.header("⚙️ Fixed Parameters (무차원 수 입력)")
 
-# 37.89mm 기준 D_eo* 초기값: 37.89 / 45.0 = 0.842
 fix_d_eo_star = st.sidebar.number_input(
     "D_eo*",
     value=0.842,
@@ -101,14 +93,12 @@ fix_n_s_star = st.sidebar.number_input(
     format="%.3f",
 )
 
-# 무차원 수 -> 실제 물리량(m) 변환
 fix_d_eo = fix_d_eo_star * d_eo_ref
 fix_d_bi = fix_d_bi_star * d_bi_ref
 fix_d_oi = fix_d_oi_star * d_oi_ref
 fix_p = fix_p_star * p_ref
 fix_n_s = fix_n_s_star * n_s_ref
 
-# 현재 입력된 무차원 수 기준 지오메트리 & 시뮬레이션 결과 계산
 d_vi_cur, d_vo_cur = hxc.hyd_dia(fix_d_bi, hxc.d_ei_ref, fix_n_s)
 theta_cur, e_cur = hxc.parameters(
     d_vo_cur, fix_d_eo, hxc.d_bo_ref, fix_n_s, fix_p
@@ -128,7 +118,6 @@ L_tot_cur, PD_t_cur, PD_a_cur, _, _, Tc_out_cur, _, _, _ = hxc.run_simulation(
     fix_d_oi,
 )
 
-# 4. 상단 카드 영역 1: 입력한 무차원 수에 따른 실제 치수 및 지오메트리 파라미터
 st.subheader("📌 Current Geometric Parameters (계산된 형상 치수)")
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric(
@@ -156,7 +145,6 @@ col_g5.metric("Helix Angle (θ)", f"{theta_cur:.2f}°")
 
 st.markdown("---")
 
-# 5. 상단 카드 영역 2: 시뮬레이션 결과 요약
 st.subheader("📊 Performance Results")
 col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
 col_m1.metric(
@@ -181,7 +169,6 @@ col_m5.metric(
 
 st.markdown("---")
 
-# 6. 파라미터 분석 그래프 렌더링 (Plotly 대화형 그래프)
 param_configs = {
     "d_eo": {
         "name": "D_eo",
