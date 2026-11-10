@@ -20,8 +20,38 @@ def find_intersections(x_arr, y_arr, limit_val):
             intersections.append(x_int)
     return intersections
 
+
+d_eo_fixed = 37.89 / 1000  # m
+
+d_vi_fixed, d_vo_fixed = hxc.hyd_dia(hxc.d_bi_ref, hxc.d_ei_ref, hxc.n_s_ref)
+theta_fixed, e_fixed = hxc.parameters(d_vo_fixed, d_eo_fixed, hxc.d_bo_ref, hxc.n_s_ref, hxc.p_ref)
+d_hyd_fixed = hxc.d_oi_ref - d_vo_fixed
+
+L_tot_fixed, PD_t_fixed, PD_a_fixed, _, _, Tc_out_fixed, _, _, _ = hxc.run_simulation(
+    ref.N_segments, ref.X_h, ref.X_c,
+    hxc.d_bi_ref, hxc.d_ei_ref, d_eo_fixed, hxc.d_bo_ref,
+    hxc.n_s_ref, hxc.p_ref, hxc.d_oi_ref
+)
+
+print("=" * 50)
+print(f"[ Fixed Condition: D_eo = {d_eo_fixed*1000:.2f} mm ]")
+print("-" * 50)
+print("1. Calculated Geometry Parameters:")
+print(f"   - Tube Equivalent Inner Dia (D_vi) : {d_vi_fixed*1000:.3f} mm")
+print(f"   - Tube Equivalent Outer Dia (D_vo) : {d_vo_fixed*1000:.3f} mm")
+print(f"   - Annular Hydraulic Dia (D_hyd)    : {d_hyd_fixed*1000:.3f} mm")
+print(f"   - Helix Angle (theta)              : {theta_fixed:.3f} deg")
+print(f"   - Rib Height (e)                   : {e_fixed*1000:.3f} mm")
+print("-" * 50)
+print("2. Simulation Results (Base State):")
+print(f"   - Total Tube Length (L_tot)        : {L_tot_fixed:.4f} m  (L* = {L_tot_fixed/L_tot_ref:.4f})")
+print(f"   - Cold Fluid Outlet Temp (Tc_out)  : {Tc_out_fixed:.2f} ℃")
+print(f"   - Tube Side Pressure Drop (PD_t)   : {PD_t_fixed/1000:.3f} kPa (ΔP_t* = {PD_t_fixed/PD_t_ref:.4f})")
+print(f"   - Annular Side Pressure Drop(PD_a) : {PD_a_fixed/1000:.3f} kPa (ΔP_a* = {PD_a_fixed/PD_a_ref:.4f})")
+print("=" * 50)
+print()
+
 param_configs = {
-    'd_eo': {'name': 'D_{eo}', 'ref': hxc.d_eo_ref, 'range': (0.801, 1.2)},
     'd_bi': {'name': 'D_{bi}', 'ref': hxc.d_bi_ref, 'range': (0.8, 1.2)},
     'd_oi': {'name': 'D_{oi}', 'ref': hxc.d_oi_ref, 'range': (0.7, 1.2)},
     'p':    {'name': 'p',        'ref': hxc.p_ref,    'range': (0.7, 1.2)},
@@ -43,13 +73,12 @@ for param_key, cfg in param_configs.items():
         
         kwargs = {
             'N_segments': ref.N_segments, 'X_h': ref.X_h, 'X_c': ref.X_c,
-            'd_bi': hxc.d_bi_ref, 'd_ei': hxc.d_ei_ref, 'd_eo': hxc.d_eo_ref, 
+            'd_bi': hxc.d_bi_ref, 'd_ei': hxc.d_ei_ref, 'd_eo': d_eo_fixed, 
             'd_bo': hxc.d_bo_ref, 'n_s_val': hxc.n_s_ref, 'p_val': hxc.p_ref, 
             'd_oi': hxc.d_oi_ref
         }
         
-        if param_key == 'd_eo': kwargs['d_eo'] = val_actual
-        elif param_key == 'd_bi': kwargs['d_bi'] = val_actual
+        if param_key == 'd_bi': kwargs['d_bi'] = val_actual
         elif param_key == 'd_oi': kwargs['d_oi'] = val_actual
         elif param_key == 'p':    kwargs['p_val'] = val_actual
         elif param_key == 'n_s':  kwargs['n_s_val'] = val_actual
@@ -98,20 +127,26 @@ for param_key, cfg in param_configs.items():
                      fontsize=9, fontweight='bold', color=color2,
                      arrowprops=dict(arrowstyle='->', color=color2, lw=1))
 
-    for x_int in a_intersections:
+    for idx, x_int in enumerate(a_intersections):
         ax2.plot(x_int, PD_a_star_limit, 'go', markersize=6)
+        
+        x_off = 0.04 if idx % 2 == 0 else -0.04
+        y_off = -0.08 if idx % 2 == 0 else -0.14
+        ha_align = 'left' if idx % 2 == 0 else 'right'
+        
         ax2.annotate(f'({x_int:.3f}, {PD_a_star_limit:.3f})',
                      xy=(x_int, PD_a_star_limit),
-                     xytext=(x_int + 0.015, PD_a_star_limit + 0.05),
+                     xytext=(x_int + x_off, PD_a_star_limit + y_off),
                      fontsize=9, fontweight='bold', color=color3,
+                     ha=ha_align, va='top',
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.85, edgecolor=color3),
                      arrowprops=dict(arrowstyle='->', color=color3, lw=1))
-
     lines = line1 + line2 + line3 + [line_lim_t, line_lim_a]
     labels = [l.get_label() for l in lines]
     ax1.legend(lines, labels, loc='upper right', fontsize=10)
 
-    plt.title(f"Parametric Analysis: Effects of ${cfg['name']}^*$", fontsize=13, fontweight='bold')
+    plt.title(f"Parametric Analysis: Effects of ${cfg['name']}^*$ (Fixed $D_{{eo}} = 37.89\\text{{ mm}}$)", fontsize=13, fontweight='bold')
     plt.tight_layout()
 
-    plt.savefig(f"plot_param_{param_key}.png", dpi=300)
+    plt.savefig(f"plot_param_{param_key}_set_deo37.png", dpi=300)
     plt.show()
