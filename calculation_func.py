@@ -4,14 +4,15 @@ import math
 # reference values, [m]
 tw = 0.5 / 1000
 d_bi_ref = 35 / 1000
-d_bo_ref = 36 / 1000
-d_ei_ref = 44 / 1000
 d_eo_ref = 45 / 1000
 d_oi_ref = 45 / 1000
-d_can = 450 / 1000
 p_ref = 25 / 1000
+n_s_ref = 4
 k_w = 401 #W/m*K
-n_s_ref = 4  # Number of starts
+
+T_1i=80
+T_1o=50
+T_2i=45
 
 # kg/s
 m_h = 3.5
@@ -48,14 +49,16 @@ def density_libr(t, x):
     a3 = (-350.97 - 324.312*x + 4.97020*(x**2)) / (10**7)
     return (a1 + a2*T + a3*(T**2))
 
-def hyd_dia(d_bi, d_ei, n_s_val):
+def hyd_dia(d_bi, d_eo, n_s_val):
+    d_ei = d_eo - 2*tw
     R = 0.6
     FB = (1-R) * math.pi * d_bi / n_s_val
     d_vi = math.sqrt(d_bi**2 + n_s_val*(d_ei - d_bi)*FB/math.pi)
     d_vo = d_vi + 2*tw
     return d_vi, d_vo
 
-def parameters(d_vo, d_eo, d_bo, n_s_val, p):
+def parameters(d_vo, d_eo, d_bi, n_s_val, p):
+    d_bo = d_bi + 2*tw
     theta = math.atan(math.pi * d_vo / (n_s_val * p)) * 180 / math.pi
     e = (d_eo - d_bo) / 2
     return theta, e
@@ -78,7 +81,7 @@ def nd_tube(c_p, rho, mu, k, e, p, theta, d_vi):
     else:
         f_t = 1.209 * (Re_t**-0.261) * (e_star_t**(1.26 - 0.05*p_star_t)) * (p_star_t**(-1.66 + 2.033*e_star_t)) * (theta_star_t**(-2.699 + 3.670*e_star_t))
     h_t = Nu_t * k / d_vi
-    return h_t, f_t, V_t
+    return h_t, f_t, V_t, Re_t
 
 def nd_annular(c_p, rho, mu, k, e, p, theta, d_vo, d_oi):
     Pr_a = c_p * mu / k
@@ -100,18 +103,16 @@ def nd_annular(c_p, rho, mu, k, e, p, theta, d_vo, d_oi):
     Nu_a = ( (f_a/8) * Re_a * Pr_a / (1 + 9.77 * math.sqrt(f_a/8) * (Pr_a**(2/3) - 1)) ) * (Re_a**-0.2) * (e_star_a**-0.32) * (p_star_a**-0.28) * (r_star**-1.64)
 
     h_a = Nu_a * k / d_hyd
-    return h_a, f_a, V_a
+    return h_a, f_a, V_a, Re_a
 
 def PD(f,L,D,rho,V):
     PD=f*(L/D)*(1/2)*rho*V**2
     return PD
 
-def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val, d_oi):
-    T_1i=80
-    T_1o=50
-    T_2i=45
-    d_vi, d_vo = hyd_dia(d_bi, d_ei, n_s_val)
-    theta, e = parameters(d_vo, d_eo, d_bo, n_s_val, p_val)
+def run_simulation(N_segments, X_h, X_c, d_bi, d_eo, n_s_val, p_val, d_oi):
+
+    d_vi, d_vo = hyd_dia(d_bi, d_eo, n_s_val)
+    theta, e = parameters(d_vo, d_eo, d_bi, n_s_val, p_val)
     d_hyd = d_oi - d_vo
 
     Th_nodes = np.linspace(T_1o, T_1i, N_segments + 1)
@@ -146,8 +147,8 @@ def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val,
         mu_c = viscosity_libr(Tc_avg, X_c)
         k_c = k_libr(Tc_avg, X_c)
         
-        h_t, f_t, V_t = nd_tube(Cp_h, rho_h, mu_h, k_h, e, p_val, theta, d_vi)
-        h_a, f_a, V_a = nd_annular(Cp_c, rho_c, mu_c, k_c, e, p_val, theta, d_vo, d_oi)
+        h_t, f_t, V_t, _ = nd_tube(Cp_h, rho_h, mu_h, k_h, e, p_val, theta, d_vi)
+        h_a, f_a, V_a, _ = nd_annular(Cp_c, rho_c, mu_c, k_c, e, p_val, theta, d_vo, d_oi)
         
         R_conv_i = (d_vo / d_vi) * (1.0 / h_t)
         R_cond   = (d_vo / (2.0 * k_w)) * np.log(d_vo / d_vi)
@@ -184,10 +185,15 @@ def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val,
     mu_c_tot = viscosity_libr(Tc_total_avg, X_c)
     k_c_tot = k_libr(Tc_total_avg, X_c)
 
-    h_t_tot, f_t_tot, V_t_tot = nd_tube(
+    properties = {
+        "Cp_h_tot": Cp_h_tot, "rho_h_tot": rho_h_tot, "mu_h_tot": mu_h_tot, "k_h_tot": k_h_tot,
+        "Cp_c_tot": Cp_c_tot, "rho_c_tot": rho_c_tot, "mu_c_tot": mu_c_tot, "k_c_tot": k_c_tot
+    }
+
+    h_t_tot, f_t_tot, V_t_tot, Re_t_tot = nd_tube(
         Cp_h_tot, rho_h_tot, mu_h_tot, k_h_tot, e, p_val, theta, d_vi
     )
-    h_a_tot, f_a_tot, V_a_tot = nd_annular(
+    h_a_tot, f_a_tot, V_a_tot, Re_a_tot = nd_annular(
         Cp_c_tot, rho_c_tot, mu_c_tot, k_c_tot, e, p_val, theta, d_vo, d_oi
     )
 
@@ -195,4 +201,4 @@ def run_simulation(N_segments, X_h, X_c, d_bi, d_ei, d_eo, d_bo, n_s_val, p_val,
     PD_a_total = PD(f_a_tot, L_total, d_hyd, rho_c_tot, V_a_tot)
 
 
-    return L_total, PD_t_total, PD_a_total, PD_t_total_sum, PD_a_total_sum, Tc_current, h_tube_list, h_ann_list, U_list
+    return L_total, PD_t_total, PD_a_total, PD_t_total_sum, PD_a_total_sum, Tc_current, h_tube_list, h_ann_list, U_list, properties

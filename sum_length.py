@@ -6,10 +6,9 @@ N_segments = 100
 
 X_h = 60.0 
 X_c = 57.0
-L_tot_ref, PD_t_ref, PD_a_ref, PD_t_sum_ref, PD_a_sum_ref,  Tc_out, h_tube_list, h_ann_list, U_list = hxc.run_simulation(
+L_tot_ref, PD_t_ref, PD_a_ref, PD_t_sum_ref, PD_a_sum_ref,  Tc_out, h_tube_list, h_ann_list, U_list,_ = hxc.run_simulation(
     N_segments, X_h, X_c,
-    hxc.d_bi_ref, hxc.d_ei_ref, hxc.d_eo_ref, hxc.d_bo_ref, 
-    hxc.n_s_ref, hxc.p_ref, hxc.d_oi_ref
+    hxc.d_bi_ref, hxc.d_eo_ref, hxc.n_s_ref, hxc.p_ref, hxc.d_oi_ref
 )
 
 print("-" * 40)
@@ -41,5 +40,5 @@ plt.grid(True, linestyle=':', alpha=0.7)
 plt.legend(fontsize=11)
 plt.tight_layout()
 
-plt.savefig('plot_result_ref.png', dpi=300)
-plt.show()
+# plt.savefig('plot_result_ref.png', dpi=300)
+# plt.show()

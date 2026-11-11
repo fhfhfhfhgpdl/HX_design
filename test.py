@@ -5,26 +5,27 @@ import sum_length as ref
 # ==========================================
 # 1. 사용자 입력 파라미터 정의 (원하는 값으로 수정 가능)
 # ==========================================
-user_d_eo = 36.09 / 1000  # m
-user_d_bi = 24.50/1000  # m
-user_d_oi = 56.00/1000  # m
-user_p    = 10/1000  # m
-user_n_s  = 12
+d_eo = 138.11 / 1000  # m
+d_bi = 71.36/1000  # m
+d_oi = 147.87/1000  # m
+p    = 34.38/1000  # m
+n_s  = 16
+d_ei = d_eo - 2*hxc.tw
+d_bo = d_bi + 2*hxc.tw
 
 # ==========================================
 # 2. 형상 치수 (Geometry Parameters) 계산
 # ==========================================
-d_vi, d_vo = hxc.hyd_dia(user_d_bi, hxc.d_ei_ref, user_n_s)
-theta, e = hxc.parameters(d_vo, user_d_eo, hxc.d_bo_ref, user_n_s, user_p)
-d_hyd = user_d_oi - d_vo
+d_vi, d_vo = hxc.hyd_dia(d_bi, d_eo, n_s)
+theta, e = hxc.parameters(d_vo, d_eo, d_bi, n_s, p)
+d_hyd = d_oi - d_vo
 
 # ==========================================
 # 3. 열교환기 시뮬레이션 실행
 # ==========================================
-L_tot, PD_t, PD_a, _, _, Tc_out, _, _, _ = hxc.run_simulation(
-    ref.N_segments, ref.X_h, ref.X_c,
-    user_d_bi, hxc.d_ei_ref, user_d_eo, hxc.d_bo_ref,
-    user_n_s, user_p, user_d_oi
+L_tot, PD_t, PD_a, PD_t_sum, PD_a_sum, Tc_out, h_t, h_a, U = hxc.run_simulation(
+    n_s, ref.X_h, ref.X_c,
+    d_bi, d_eo, n_s, p, d_oi
 )
 
 # ==========================================
@@ -32,11 +33,11 @@ L_tot, PD_t, PD_a, _, _, Tc_out, _, _, _ = hxc.run_simulation(
 # ==========================================
 print("=" * 50)
 print("[ Input Parameters ]")
-print(f"  - D_eo : {user_d_eo*1000:6.2f} mm")
-print(f"  - D_bi : {user_d_bi*1000:6.2f} mm")
-print(f"  - D_oi : {user_d_oi*1000:6.2f} mm")
-print(f"  - p    : {user_p*1000:6.2f} mm")
-print(f"  - N_s  : {user_n_s:6.2f}")
+print(f"  - D_eo : {d_eo*1000:6.2f} mm")
+print(f"  - D_bi : {d_bi*1000:6.2f} mm")
+print(f"  - D_oi : {d_oi*1000:6.2f} mm")
+print(f"  - p    : {p*1000:6.2f} mm")
+print(f"  - N_s  : {n_s:6.2f}")
 print("-" * 50)
 print("[ Calculated Geometry Parameters ]")
 print(f"  - Tube Equivalent Inner Dia (D_vi) : {d_vi*1000:6.3f} mm")
