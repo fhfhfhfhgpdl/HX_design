@@ -11,13 +11,14 @@ def derived(d_bi, d_eo):
     if not DERIVE_GEOMETRY: return hxc.d_bo_ref, hxc.d_ei_ref
     return d_bi + 2*hxc.tw, d_eo - 2*hxc.tw
 
-BOUNDS = dict(d_eo=(50, 160), d_bi=(10, 150), d_oi=(100, 220), p=(2.5, 30))
-NS_LIST = range(2, 36)
+BOUNDS = dict(d_eo=(50, 200), d_bi=(10, 180), d_oi=(80, 220), p=(2.0, 80))
+NS_LIST = range(2, 41)
 
-USE_VALIDITY = False
+USE_VALIDITY = True
 USE_RSTAR    = False
 V = dict(e_t=(0.11, 0.42), p_t=(0.41, 7.29), th=(0.28, 0.65),
          e_a=(0.104, 0.384), p_a=(0.383, 6.714), r=(0.388, 0.604))
+V2=dict(e_t=(0.001, 0.698), p_t=(0.01, 25.2))
 
 def rv(v, lo, hi): return max(0, lo - v)/lo + max(0, v - hi)/hi
 def evaluate(x, ns):
@@ -39,25 +40,23 @@ def evaluate(x, ns):
     return None, 1 + abs(e) / d_eo
 
   v = 0.0
+
   if USE_VALIDITY:
-    v = (
-        rv(e / d_vi, *V["e_t"])
+    v = rv(e/d_vi, *V2["e_t"]) + rv(p/d_vi, *V2["p_t"])
+    '''v = (rv(e / d_vi, *V["e_t"])
         + rv(p / d_vi, *V["p_t"])
         + rv(e / d_vo, *V["e_a"])
         + rv(p / d_vo, *V["p_a"])
-        + rv(theta / 90, *V["th"])
-    )
+        + rv(theta / 90, *V["th"]))'''
     if USE_RSTAR:
       v += rv(d_vo / d_oi, *V["r"])
 
   try:
-    # 안전하게 시뮬레이션 실행 (앞의 3개 결과만 언패킹)
     res_sim = hxc.run_simulation(
         ref.N_segments, ref.X_h, ref.X_c, d_bi, d_eo, ns, p, d_oi
     )
     L, PDt, PDa = res_sim[0], res_sim[1], res_sim[2]
 
-    # Re 수는 평균 온도 물성치 함수를 직접 호출해 계산 (KeyError/AttributeError 완벽 방지)
     Th_avg = 65.0
     rho_h = hxc.density_libr(Th_avg, ref.X_h)
     mu_h = hxc.viscosity_libr(Th_avg, ref.X_h)
@@ -73,8 +72,6 @@ def evaluate(x, ns):
     Re_a = V_a * rho_c * d_hyd / mu_c
 
   except Exception as err:
-    # 혹시 에러가 난다면 무슨 에러인지 터미널에 살짝 띄워 확인 가능
-    # print(f"Debug Error: {err}")
     return None, 1.0
 
   if not np.isfinite([L, PDt, PDa]).all() or L <= 0:
@@ -93,24 +90,21 @@ def objective(x, ns):
 def _objective(x, ns):
     res, gv = evaluate(x, ns)
     if res is None:
-        return 1e4 + gv * 100  # 불가능 영역 페널티 연속화
+        return 1e4 + gv * 100  
     
     L, PDt, PDa, v, _ = res
     
-    # 50kPa 이하일 때 추가 페널티 0 (오직 L 최소화에 전력)
-    # 50kPa 초과할 때만 비율만큼 페널티 부여
     pd_penalty = 0.0
     if PDt > PD_LIM:
         pd_penalty += (PDt - PD_LIM) / 1000.0 * 50.0
     if PDa > PD_LIM:
         pd_penalty += (PDa - PD_LIM) / 1000.0 * 50.0
         
-    return L + pd_penalty
+    return L + pd_penalty + 1e3 * v
 
 def solve_ns(ns, seed=42):
     b = [BOUNDS[k] for k in ("d_eo", "d_bi", "d_oi", "p")]
     
-    # 적절한 인구수(popsize=15)와 세대수(maxiter=50) 지정
     de = differential_evolution(objective, b, args=(ns,), seed=seed, maxiter=50, popsize=15,
                                  tol=1e-4, polish=False, updating="deferred")
     nm = minimize(objective, de.x, args=(ns,), method="Nelder-Mead",
@@ -118,8 +112,7 @@ def solve_ns(ns, seed=42):
     x = nm.x if nm.fun < de.fun else de.x
     res, _ = evaluate(x, ns)
     
-    # 해 성립 여부 판정 (압력강하 50kPa 기준 1% 여유 인정)
-    ok = (res is not None) and (res[1] <= PD_LIM * 1.01) and (res[2] <= PD_LIM * 1.01)
+    ok = (res is not None) and (res[1] <= PD_LIM * 1.01) and (res[2] <= PD_LIM * 1.01) and (res[3] < 1e-9)
     return x, res, ok
 
 if __name__ == "__main__":
@@ -152,8 +145,11 @@ if __name__ == "__main__":
             "D_vo_mm": round(d_vo * 1000, 3),
             "theta_deg": round(theta, 2),
             "e_mm": round(e * 1000, 3),
+            "e_star_t": round(e / d_vi, 4),
+            "p_star_t": round(p / d_vi, 4),
             "Re_t": round(Re_t, 1),
-            "Re_a": round(Re_a, 1)
+            "Re_a": round(Re_a, 1),
+            "Validity_Violation": round(v, 6)
         })
         
         print(f"N_s={ns:2d} | L={L:.4f} m | PDt={PDt/1e3:5.1f} kPa | PDa={PDa/1e3:5.1f} kPa | "
@@ -162,8 +158,8 @@ if __name__ == "__main__":
     if results_list:
         df_results = pd.DataFrame(results_list)
         df_results = df_results.sort_values(by="L_m").reset_index(drop=True)
-        df_results.to_csv("optimization_results_nv_.csv", index=False, encoding="utf-8-sig")
-        print("\n[완료] 최적화 결과가 'optimization_results_nv_.csv'로 정상 저장되었습니다.")
+        df_results.to_csv("optimization_results_pv_.csv", index=False, encoding="utf-8-sig")
+        print("\n[완료] 최적화 결과가 'optimization_results_pv_.csv'로 정상 저장되었습니다.")
 
         out.sort(key=lambda r: r[0])
         print("\n=== TOP 5 (L 오름차순) ===")
